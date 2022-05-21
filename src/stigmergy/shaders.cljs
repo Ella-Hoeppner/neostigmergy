@@ -214,9 +214,16 @@
               trailValue2 float}
     :outputs '{newAgentColor uvec4}
     :signatures '{rand ([vec2] float)
-                  main ([] void)}
+                  main ([] void)
+                  behavior ([float float float float] vec4)}
     :functions
-    {'rand
+    {'behavior
+     '([a b c d]
+       (vec4 "0.00025"
+             "0.0001"
+             "1.0"
+             "0.5"))
+     'rand
      '([p]
        (=vec3 p3 (fract (* (vec3 p.xyx) "0.1031")))
        (+= p3 (dot p3 (+ p3.yzx "33.33")))
@@ -233,11 +240,16 @@
         (=vec2 pos
                (/ (vec2 oldAgentColor.xy)
                   :uint16-max))
+        
+        (=vec4 behaviorResult (behavior "0.0" "0.0" "0.0" "0.0"))
+        (=vec2 velocity behaviorResult.xy)
+        (=float substrateValue1 behaviorResult.z)
+        (=float substrateValue2 behaviorResult.w)
+
         (=vec2 newPos
                (fract
                 (+ pos
-                   (vec2 "0.00025" "0.0"))))
-
+                   velocity)))
         (=vec2 randSeed
                (+ (vec2 oldAgentColor.xy)
                   gl_FragCoord.xy))
@@ -247,10 +259,11 @@
         (= newAgentColor
            (if (== randomize 0)
              (uvec4 (* :uint16-max newPos)
-                    :uint16-max
-                    :uint16-max)
+                    (* substrateValue1 :uint16-max)
+                    (* substrateValue2 :uint16-max))
              (uvec4 (* :uint16-max randPos)
-                    0
-                    0)))))}}
-   ["rand"
+                    (* "0.5" :uint16-max)
+                    (* "0.5" :uint16-max))))))}}
+   ["behavior"
+    "rand"
     "main"]))
