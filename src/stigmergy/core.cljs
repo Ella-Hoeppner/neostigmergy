@@ -1,12 +1,12 @@
-(ns ants.core
-  (:require [ants.util :as u]
-            [ants.glsl-util :refer [create-shader
+(ns stigmergy.core
+  (:require [stigmergy.util :as u]
+            [stigmergy.glsl-util :refer [create-shader
                                     create-program]]
-            [ants.keyboard :refer [add-key-callback]]
-            [ants.config :refer [substrate-resolution
+            [stigmergy.keyboard :refer [add-key-callback]]
+            [stigmergy.config :refer [substrate-resolution
                                  background-color
                                  uint16-max]]
-            [ants.shaders :refer [trivial-vert-source
+            [stigmergy.shaders :refer [trivial-vert-source
                                   draw-frag-source
                                   substrate-frag-source
                                   trail-vert-source

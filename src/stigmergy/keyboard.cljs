@@ -1,5 +1,5 @@
-(ns ants.keyboard
-  (:require [ants.util :as u]))
+(ns stigmergy.keyboard
+  (:require [stigmergy.util :as u]))
 
 (defonce key-callbacks (atom {}))
 

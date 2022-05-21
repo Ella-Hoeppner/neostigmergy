@@ -1,4 +1,4 @@
-(ns ants.config)
+(ns stigmergy.config)
 
 (def substrate-resolution 1024)
 (def point-size 50)

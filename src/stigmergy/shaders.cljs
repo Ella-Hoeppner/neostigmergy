@@ -1,8 +1,8 @@
-(ns ants.shaders
-  (:require [ants.glsl-util :refer [reorder-functions]]
+(ns stigmergy.shaders
+  (:require [stigmergy.glsl-util :refer [reorder-functions]]
             [iglu.core :refer [iglu->glsl]]
             [clojure.walk :refer [postwalk-replace]]
-            [ants.config :refer [substrate-resolution
+            [stigmergy.config :refer [substrate-resolution
                                  gaussian-radius
                                  gaussian-sigma-1
                                  gaussian-sigma-2

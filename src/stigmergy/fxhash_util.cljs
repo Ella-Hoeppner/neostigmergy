@@ -1,4 +1,4 @@
-(ns ants.fxhash-util)
+(ns stigmergy.fxhash-util)
 
 (defn fxrand
   ([] (js/fxrand))

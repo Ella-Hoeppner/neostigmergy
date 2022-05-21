@@ -1,5 +1,5 @@
-(ns ants.glsl-util
-  (:require [ants.util :as u]
+(ns stigmergy.glsl-util
+  (:require [stigmergy.util :as u]
             [clojure.set :refer [map-invert]]
             [clojure.string :refer [split
                                     index-of]]))

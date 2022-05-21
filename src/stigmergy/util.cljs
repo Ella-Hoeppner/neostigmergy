@@ -1,4 +1,4 @@
-(ns ants.util)
+(ns stigmergy.util)
 
 (defn now []
   (js/Date.now))
