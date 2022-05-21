@@ -9,7 +9,8 @@
                                       uint16-max
                                       point-size
                                       trail-opacity
-                                      agent-count-sqrt]]
+                                      agent-count-sqrt
+                                      substrate-fade-factor]]
             [clojure.string :as string]))
 
 (defn generate-gaussian-expression [value-fn radius sigma]
@@ -116,7 +117,8 @@
         (generate-gaussian-expression 'getValue2
                                       gaussian-radius
                                       gaussian-sigma-2)
-        :trail-opacity (.toFixed trail-opacity 8)}
+        :trail-opacity (.toFixed trail-opacity 8)
+        :substrate-fade-factor (.toFixed substrate-fade-factor 8)}
        '([]
          (=uvec4 trailColor (texture trail
                                      (/ gl_FragCoord.xy
@@ -132,10 +134,12 @@
          (= fragColor
             (uvec4 (* (+ :blur-exp-1
                          (* :trail-opacity trailValue1))
-                      :uint16-max)
+                      :uint16-max
+                      :substrate-fade-factor)
                    (* (+ :blur-exp-2
                          (* :trail-opacity trailValue2))
-                      :uint16-max)
+                      :uint16-max
+                      :substrate-fade-factor)
                    0
                    0))))}})
    ["getValue1"
@@ -222,9 +226,18 @@
       {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
        :uint16-max (.toFixed uint16-max 1)}
       '([]
-        (=uvec4 oldAgentColor (texture oldAgentTex
-                                       (/ gl_FragCoord.xy
-                                          (vec2 :agent-count-sqrt))))
+        (=uvec4 oldAgentColor
+                (texture oldAgentTex
+                         (/ gl_FragCoord.xy
+                            (vec2 :agent-count-sqrt))))
+        (=vec2 pos
+               (/ (vec2 oldAgentColor.xy)
+                  :uint16-max))
+        (=vec2 newPos
+               (fract
+                (+ pos
+                   (vec2 "0.00025" "0.0"))))
+
         (=vec2 randSeed
                (+ (vec2 oldAgentColor.xy)
                   gl_FragCoord.xy))
@@ -233,7 +246,9 @@
                      (rand (+ randSeed (vec2 "0.1" "-0.5")))))
         (= newAgentColor
            (if (== randomize 0)
-             oldAgentColor
+             (uvec4 (* :uint16-max newPos)
+                    0
+                    0)
              (uvec4 (* :uint16-max randPos)
                     0
                     0)))))}}
