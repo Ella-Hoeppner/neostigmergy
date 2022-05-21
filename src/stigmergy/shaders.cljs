@@ -10,7 +10,8 @@
                                       point-size
                                       trail-opacity
                                       agent-count-sqrt
-                                      substrate-fade-factor]]
+                                      substrate-fade-factor
+                                      sensor-distance]]
             [clojure.string :as string]))
 
 (defn generate-gaussian-expression [value-fn radius sigma]
@@ -209,13 +210,16 @@
    {:version "300 es"
     :precision "highp float"
     :uniforms '{randomize int
+                substrate usampler2D
                 oldAgentTex usampler2D}
     :inputs '{trailValue1 float
               trailValue2 float}
     :outputs '{newAgentColor uvec4}
     :signatures '{rand ([vec2] float)
-                  main ([] void)
-                  behavior ([float float float float] vec4)}
+                  behavior ([float float float float] vec4)
+                  getSensorValue1 ([vec2] float)
+                  getSensorValue2 ([vec2] float)
+                  main ([] void)}
     :functions
     {'behavior
      '([a b c d]
@@ -228,10 +232,25 @@
        (=vec3 p3 (fract (* (vec3 p.xyx) "0.1031")))
        (+= p3 (dot p3 (+ p3.yzx "33.33")))
        (fract (* (+ p3.x p3.y) p3.z)))
+     'getSensorValue1
+     (postwalk-replace
+      {:uint16-max (.toFixed uint16-max 1)}
+      '([pos]
+        (/ (float
+            (.x (texture substrate (fract pos))))
+           :uint16-max)))
+     'getSensorValue2
+     (postwalk-replace
+      {:uint16-max (.toFixed uint16-max 1)}
+      '([pos]
+        (/ (float
+            (.y (texture substrate (fract pos))))
+           :uint16-max)))
      'main
      (postwalk-replace
       {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
-       :uint16-max (.toFixed uint16-max 1)}
+       :uint16-max (.toFixed uint16-max 1)
+       :sensor-distance (.toFixed sensor-distance 8)}
       '([]
         (=uvec4 oldAgentColor
                 (texture oldAgentTex
@@ -240,8 +259,32 @@
         (=vec2 pos
                (/ (vec2 oldAgentColor.xy)
                   :uint16-max))
-        
-        (=vec4 behaviorResult (behavior "0.0" "0.0" "0.0" "0.0"))
+
+        (=vec4 behaviorResult
+               (behavior (- (getSensorValue1 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "1.0" "0.0"))))
+                            (getSensorValue1 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "-1.0" "0.0")))))
+                         (- (getSensorValue1 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "0.0" "1.0"))))
+                            (getSensorValue1 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "0.0" "-1.0")))))
+                         (- (getSensorValue2 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "1.0" "0.0"))))
+                            (getSensorValue2 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "-1.0" "0.0")))))
+                         (- (getSensorValue2 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "0.0" "1.0"))))
+                            (getSensorValue2 (+ pos
+                                                (* :sensor-distance
+                                                   (vec2 "0.0" "-1.0")))))))
         (=vec2 velocity behaviorResult.xy)
         (=float substrateValue1 behaviorResult.z)
         (=float substrateValue2 behaviorResult.w)
@@ -265,5 +308,7 @@
                     (* "0.5" :uint16-max)
                     (* "0.5" :uint16-max))))))}}
    ["behavior"
+    "getSensorValue1"
+    "getSensorValue2"
     "rand"
     "main"]))

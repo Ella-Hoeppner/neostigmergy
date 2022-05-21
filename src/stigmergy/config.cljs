@@ -9,6 +9,7 @@
 (def gaussian-sigma-2 0.6)
 (def trail-opacity 0.1)
 (def substrate-fade-factor 0.999)
+(def sensor-distance 0.01)
 
 (def background-color
   [0 0 0])

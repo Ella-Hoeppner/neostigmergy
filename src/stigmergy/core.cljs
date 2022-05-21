@@ -25,6 +25,7 @@
 (defonce agents-program-atom (atom nil))
 (defonce agents-old-agent-tex-u-atom (atom nil))
 (defonce agents-randomize-u-atom (atom nil))
+(defonce agents-substrate-u-atom (atom nil))
 
 (defonce substrate-program-atom (atom nil))
 (defonce substrate-old-substrate-u-atom (atom nil))
@@ -70,6 +71,9 @@
     (.activeTexture gl gl.TEXTURE0)
     (.bindTexture gl gl.TEXTURE_2D @agent-tex-front-atom)
     (.uniform1i gl @agents-old-agent-tex-u-atom 0)
+    (.activeTexture gl gl.TEXTURE1)
+    (.bindTexture gl gl.TEXTURE_2D @substrate-tex-front-atom)
+    (.uniform1i gl @agents-substrate-u-atom 0)
     (.uniform1i gl @agents-randomize-u-atom 1)
     (.drawArrays gl gl.TRIANGLES 0 3)
     (flip-textures! agent-tex-front-atom agent-tex-back-atom)))
@@ -217,6 +221,8 @@
               (.getUniformLocation gl agents-program "oldAgentTex"))
       (reset! agents-randomize-u-atom
               (.getUniformLocation gl agents-program "randomize"))
+      (reset! agents-substrate-u-atom
+              (.getUniformLocation gl agents-program "substrate"))
       (let [attrib (.getAttribLocation gl agents-program "vertPos")]
         (.enableVertexAttribArray gl attrib)
         (.vertexAttribPointer gl
