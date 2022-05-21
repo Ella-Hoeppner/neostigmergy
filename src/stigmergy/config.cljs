@@ -3,7 +3,7 @@
 (def agent-count-sqrt 10)
 
 (def substrate-resolution 1024)
-(def point-size 4)
+(def point-size 0.005)
 (def gaussian-radius 3)
 (def gaussian-sigma-1 0.6)
 (def gaussian-sigma-2 0.6)

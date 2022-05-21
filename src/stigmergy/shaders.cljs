@@ -159,7 +159,9 @@
     (postwalk-replace
      {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
       :uint16-max (.toFixed uint16-max 1)
-      :point-size (.toFixed point-size 8)}
+      :point-size (.toFixed (* substrate-resolution
+                               point-size)
+                            8)}
      '{main
        ([]
         (=float agentTexX
