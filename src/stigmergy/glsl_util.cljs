@@ -25,6 +25,40 @@
       program
       (throw (js/Error. (str (.getProgramInfoLog gl program)))))))
 
+(defn create-ui16-tex [gl resolution & [clamp?]]
+  (let [tex (.createTexture gl)]
+    (.bindTexture gl gl.TEXTURE_2D tex)
+    (.texImage2D gl
+                 gl.TEXTURE_2D
+                 0
+                 gl.RGBA16UI
+                 resolution
+                 resolution
+                 0
+                 gl.RGBA_INTEGER
+                 gl.UNSIGNED_SHORT
+                 nil)
+    (.texParameteri gl
+                    gl.TEXTURE_2D
+                    gl.TEXTURE_MIN_FILTER
+                    gl.NEAREST)
+    (.texParameteri gl
+                    gl.TEXTURE_2D
+                    gl.TEXTURE_MAG_FILTER
+                    gl.NEAREST)
+    (let [wrap-mode (if clamp?
+                      gl.CLAMP_TO_EDGE
+                      gl.REPEAT)]
+      (.texParameteri gl
+                      gl.TEXTURE_2D
+                      gl.TEXTURE_WRAP_S
+                      wrap-mode)
+      (.texParameteri gl
+                      gl.TEXTURE_2D
+                      gl.TEXTURE_WRAP_T
+                      wrap-mode))
+    tex))
+
 (defn reorder-functions [source function-order]
   (let [lines (split source "\n")
         line-count (count lines)

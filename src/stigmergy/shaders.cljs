@@ -3,12 +3,13 @@
             [iglu.core :refer [iglu->glsl]]
             [clojure.walk :refer [postwalk-replace]]
             [stigmergy.config :refer [substrate-resolution
-                                 gaussian-radius
-                                 gaussian-sigma-1
-                                 gaussian-sigma-2
-                                 uint16-max
-                                 point-size
-                                 trail-opacity]]
+                                      gaussian-radius
+                                      gaussian-sigma-1
+                                      gaussian-sigma-2
+                                      uint16-max
+                                      point-size
+                                      trail-opacity
+                                      agent-count-sqrt]]
             [clojure.string :as string]))
 
 (defn generate-gaussian-expression [value-fn radius sigma]
@@ -146,15 +147,31 @@
    {:version "300 es"
     :precision "highp float"
     :signatures '{main ([] void)}
+    :uniforms '{agentTex usampler2D}
     :outputs '{trailValue1 float
                trailValue2 float}
     :functions
     (postwalk-replace
-     {:point-size (.toFixed point-size 8)}
+     {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
+      :uint16-max (.toFixed uint16-max 1)
+      :point-size (.toFixed point-size 8)}
      '{main
        ([]
-        (= gl_Position (vec4 (* "0.1" (float gl_VertexID))
-                             (* "0.1" (float gl_VertexID))
+        (=float agentTexX
+                (/ (+ (mod (float gl_VertexID) :agent-count-sqrt)
+                      "0.5")
+                   :agent-count-sqrt))
+        (=float agentTexY
+                (/ (+ (floor (/ (float gl_VertexID) :agent-count-sqrt))
+                      "0.5")
+                   :agent-count-sqrt))
+        (=uvec4 agentColor
+                (texture agentTex
+                         (vec2 agentTexX agentTexY)))
+        (=float agentX (/ (float agentColor.x) :uint16-max))
+        (=float agentY (/ (float agentColor.y) :uint16-max))
+        (= gl_Position (vec4 (- (* agentX "2.0") "1.0")
+                             (- (* agentY "2.0") "1.0")
                              "0.0"
                              "1.0"))
         (= trailValue1 (max "0.5" (float gl_VertexID)))
@@ -182,3 +199,43 @@
                            (* trailValue2 (float :uint16-max))
                            0
                            0)))})}))
+
+(def agents-frag-source
+  (iglu-wrapper
+   {:version "300 es"
+    :precision "highp float"
+    :uniforms '{randomize int
+                oldAgentTex usampler2D}
+    :inputs '{trailValue1 float
+              trailValue2 float}
+    :outputs '{newAgentColor uvec4}
+    :signatures '{rand ([vec2] float)
+                  main ([] void)}
+    :functions
+    {'rand
+     '([p]
+       (=vec3 p3 (fract (* (vec3 p.xyx) "0.1031")))
+       (+= p3 (dot p3 (+ p3.yzx "33.33")))
+       (fract (* (+ p3.x p3.y) p3.z)))
+     'main
+     (postwalk-replace
+      {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
+       :uint16-max (.toFixed uint16-max 1)}
+      '([]
+        (=uvec4 oldAgentColor (texture oldAgentTex
+                                       (/ gl_FragCoord.xy
+                                          (vec2 :agent-count-sqrt))))
+        (=vec2 randSeed
+               (+ (vec2 oldAgentColor.xy)
+                  gl_FragCoord.xy))
+        (=vec2 randPos
+               (vec2 (rand randSeed)
+                     (rand (+ randSeed (vec2 "0.1" "-0.5")))))
+        (= newAgentColor
+           (if (== randomize 0)
+             oldAgentColor
+             (uvec4 (* :uint16-max randPos)
+                    0
+                    0)))))}}
+   ["rand"
+    "main"]))
