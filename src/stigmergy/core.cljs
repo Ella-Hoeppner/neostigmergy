@@ -30,6 +30,40 @@
 
 (defonce framebuffer-atom (atom nil))
 
+(defn create-ui16-tex [gl resolution & [clamp?]]
+  (let [tex (.createTexture gl)]
+    (.bindTexture gl gl.TEXTURE_2D tex)
+    (.texImage2D gl
+                 gl.TEXTURE_2D
+                 0
+                 gl.RGBA16UI
+                 resolution
+                 resolution
+                 0
+                 gl.RGBA_INTEGER
+                 gl.UNSIGNED_SHORT
+                 nil)
+    (.texParameteri gl
+                    gl.TEXTURE_2D
+                    gl.TEXTURE_MIN_FILTER
+                    gl.NEAREST)
+    (.texParameteri gl
+                    gl.TEXTURE_2D
+                    gl.TEXTURE_MAG_FILTER
+                    gl.NEAREST)
+    (let [wrap-mode (if clamp?
+                      gl.CLAMP_TO_EDGE
+                      gl.REPEAT)]
+      (.texParameteri gl
+                      gl.TEXTURE_2D
+                      gl.TEXTURE_WRAP_S
+                      wrap-mode)
+      (.texParameteri gl
+                      gl.TEXTURE_2D
+                      gl.TEXTURE_WRAP_T
+                      wrap-mode))
+    tex))
+
 (defn resize-canvas [canvas]
   (let [w js/window.innerWidth
         h js/window.innerHeight
@@ -158,99 +192,18 @@
                               gl.FLOAT
                               false
                               0
-                              0))
-      (let [tex (.createTexture gl)]
-        (.bindTexture gl gl.TEXTURE_2D tex)
-        (.texImage2D gl
-                     gl.TEXTURE_2D
-                     0
-                     gl.RGBA16UI
-                     substrate-resolution
-                     substrate-resolution
-                     0
-                     gl.RGBA_INTEGER
-                     gl.UNSIGNED_SHORT
-                     nil)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_MIN_FILTER
-                        gl.NEAREST)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_MAG_FILTER
-                        gl.NEAREST)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_WRAP_S
-                        gl.REPEAT)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_WRAP_T
-                        gl.REPEAT)
-        (reset! substrate-tex-front-atom tex))
-      (let [tex (.createTexture gl)]
-        (.bindTexture gl gl.TEXTURE_2D tex)
-        (.texImage2D gl
-                     gl.TEXTURE_2D
-                     0
-                     gl.RGBA16UI
-                     substrate-resolution
-                     substrate-resolution
-                     0
-                     gl.RGBA_INTEGER
-                     gl.UNSIGNED_SHORT
-                     nil)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_MIN_FILTER
-                        gl.NEAREST)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_MAG_FILTER
-                        gl.NEAREST)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_WRAP_S
-                        gl.REPEAT)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_WRAP_T
-                        gl.REPEAT)
-        (reset! substrate-tex-back-atom tex)))
+                              0)))
     (let [trail-program
           (create-program gl
                           (create-shader gl :vert trail-vert-source)
                           (create-shader gl :frag trail-frag-source))]
-      (reset! trail-program-atom trail-program)
-      (let [tex (.createTexture gl)]
-        (.bindTexture gl gl.TEXTURE_2D tex)
-        (.texImage2D gl
-                     gl.TEXTURE_2D
-                     0
-                     gl.RGBA16UI
-                     substrate-resolution
-                     substrate-resolution
-                     0
-                     gl.RGBA_INTEGER
-                     gl.UNSIGNED_SHORT
-                     nil)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_MIN_FILTER
-                        gl.NEAREST)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_MAG_FILTER
-                        gl.NEAREST)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_WRAP_S
-                        gl.REPEAT)
-        (.texParameteri gl
-                        gl.TEXTURE_2D
-                        gl.TEXTURE_WRAP_T
-                        gl.REPEAT)
-        (reset! trail-tex-atom tex)))
+      (reset! trail-program-atom trail-program))
+    (reset! substrate-tex-front-atom
+            (create-ui16-tex gl substrate-resolution))
+    (reset! substrate-tex-back-atom
+            (create-ui16-tex gl substrate-resolution))
+    (reset! trail-tex-atom
+            (create-ui16-tex gl substrate-resolution))
     (reset! framebuffer-atom (.createFramebuffer gl))))
 
 (defn init []
