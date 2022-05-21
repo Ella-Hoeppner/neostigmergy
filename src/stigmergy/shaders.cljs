@@ -174,12 +174,12 @@
                          (vec2 agentTexX agentTexY)))
         (=float agentX (/ (float agentColor.x) :uint16-max))
         (=float agentY (/ (float agentColor.y) :uint16-max))
+        (= trailValue1 (/ (float agentColor.z) :uint16-max))
+        (= trailValue2 (/ (float agentColor.w) :uint16-max))
         (= gl_Position (vec4 (- (* agentX "2.0") "1.0")
                              (- (* agentY "2.0") "1.0")
                              "0.0"
                              "1.0"))
-        (= trailValue1 (max "0.5" (float gl_VertexID)))
-        (= trailValue2 (max "0.5" (- "1.0" (float gl_VertexID))))
         (= gl_PointSize :point-size))})}))
 
 (def trail-frag-source
@@ -247,8 +247,8 @@
         (= newAgentColor
            (if (== randomize 0)
              (uvec4 (* :uint16-max newPos)
-                    0
-                    0)
+                    :uint16-max
+                    :uint16-max)
              (uvec4 (* :uint16-max randPos)
                     0
                     0)))))}}
