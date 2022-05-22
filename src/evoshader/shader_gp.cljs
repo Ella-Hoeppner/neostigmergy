@@ -32,7 +32,7 @@
                   [:* (* arg0 arg1)]
                   [:- (- arg0 arg1)]
                   [:div (safeDiv arg0 arg1)]
-                  [:mod (if (== arg0 "0.0") "0.0" (mod arg0 arg1))]
+                  [:mod (if (== arg0 "0.0") "0.0" (mod (abs arg0) (abs arg1)))]
                   [:neg (- arg0)]
                   [:inv (safeDiv "1.0" arg0)]
                   [:sin (sin arg0)]
