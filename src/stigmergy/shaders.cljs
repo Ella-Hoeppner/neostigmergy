@@ -4,14 +4,14 @@
             [clojure.walk :refer [postwalk-replace]]
             [stigmergy.config :refer [substrate-resolution
                                       gaussian-radius
-                                      gaussian-sigma-1
-                                      gaussian-sigma-2
+                                      gaussian-sigma
                                       uint16-max
                                       point-size
                                       trail-opacity
                                       agent-count-sqrt
                                       substrate-fade-factor
-                                      sensor-distance]]
+                                      sensor-distance
+                                      agent-speed-factor]]
             [clojure.string :as string]))
 
 (defn generate-gaussian-expression [value-fn radius sigma]
@@ -113,11 +113,11 @@
        {:blur-exp-1
         (generate-gaussian-expression 'getValue1
                                       gaussian-radius
-                                      gaussian-sigma-1)
+                                      gaussian-sigma)
         :blur-exp-2
         (generate-gaussian-expression 'getValue2
                                       gaussian-radius
-                                      gaussian-sigma-2)
+                                      gaussian-sigma)
         :trail-opacity (.toFixed trail-opacity 8)
         :substrate-fade-factor (.toFixed substrate-fade-factor 8)}
        '([]
@@ -207,109 +207,120 @@
                            0
                            0)))})}))
 
-(def agents-frag-source
+(defn get-agents-frag-source [chunk]
   (iglu-wrapper
-   {:version "300 es"
-    :precision "highp float"
-    :uniforms '{randomize int
-                substrate usampler2D
-                oldAgentTex usampler2D}
-    :inputs '{trailValue1 float
-              trailValue2 float}
-    :outputs '{newAgentColor uvec4}
-    :signatures '{rand ([vec2] float)
-                  behavior ([float float float float] vec4)
-                  getSensorValue1 ([vec2] float)
-                  getSensorValue2 ([vec2] float)
-                  main ([] void)}
-    :functions
-    {'behavior
-     '([a b c d]
-       (vec4 "0.00025"
-             "0.0001"
-             "1.0"
-             "0.5"))
-     'rand
-     '([p]
-       (=vec3 p3 (fract (* (vec3 p.xyx) "0.1031")))
-       (+= p3 (dot p3 (+ p3.yzx "33.33")))
-       (fract (* (+ p3.x p3.y) p3.z)))
-     'getSensorValue1
-     (postwalk-replace
-      {:uint16-max (.toFixed uint16-max 1)}
-      '([pos]
-        (/ (float
-            (.x (texture substrate (fract pos))))
-           :uint16-max)))
-     'getSensorValue2
-     (postwalk-replace
-      {:uint16-max (.toFixed uint16-max 1)}
-      '([pos]
-        (/ (float
-            (.y (texture substrate (fract pos))))
-           :uint16-max)))
-     'main
-     (postwalk-replace
-      {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
-       :uint16-max (.toFixed uint16-max 1)
-       :sensor-distance (.toFixed sensor-distance 8)}
-      '([]
-        (=uvec4 oldAgentColor
-                (texture oldAgentTex
-                         (/ gl_FragCoord.xy
-                            (vec2 :agent-count-sqrt))))
-        (=vec2 pos
-               (/ (vec2 oldAgentColor.xy)
-                  :uint16-max))
+   (merge-with
+    merge
+    {:version "300 es"
+     :precision "highp float"
+     :uniforms '{randomize int
+                 substrate usampler2D
+                 oldAgentTex usampler2D}
+     :inputs '{trailValue1 float
+               trailValue2 float}
+     :outputs '{newAgentColor uvec4}
+     :signatures '{rand ([vec2] float)
+                   behavior ([float float float float] vec4)
+                   getSensorValue1 ([vec2] float)
+                   getSensorValue2 ([vec2] float)
+                   main ([] void)}
+     :functions
+     {'behavior
+      '([a b c d]
+        (vec4 "0.00025"
+              "0.0001"
+              "1.0"
+              "0.5"))
+      'rand
+      '([p]
+        (=vec3 p3 (fract (* (vec3 p.xyx) "0.1031")))
+        (+= p3 (dot p3 (+ p3.yzx "33.33")))
+        (fract (* (+ p3.x p3.y) p3.z)))
+      'getSensorValue1
+      (postwalk-replace
+       {:uint16-max (.toFixed uint16-max 1)}
+       '([pos]
+         (/ (float
+             (.x (texture substrate (fract pos))))
+            :uint16-max)))
+      'getSensorValue2
+      (postwalk-replace
+       {:uint16-max (.toFixed uint16-max 1)}
+       '([pos]
+         (/ (float
+             (.y (texture substrate (fract pos))))
+            :uint16-max)))
+      'main
+      (postwalk-replace
+       {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
+        :uint16-max (.toFixed uint16-max 1)
+        :sensor-distance (.toFixed sensor-distance 8)
+        :agent-speed-factor (.toFixed agent-speed-factor 8)}
+       '([]
+         (=uvec4 oldAgentColor
+                 (texture oldAgentTex
+                          (/ gl_FragCoord.xy
+                             (vec2 :agent-count-sqrt))))
+         (=vec2 pos
+                (/ (vec2 oldAgentColor.xy)
+                   :uint16-max))
 
-        (=vec4 behaviorResult
-               (behavior (- (getSensorValue1 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "1.0" "0.0"))))
-                            (getSensorValue1 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "-1.0" "0.0")))))
-                         (- (getSensorValue1 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "0.0" "1.0"))))
-                            (getSensorValue1 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "0.0" "-1.0")))))
-                         (- (getSensorValue2 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "1.0" "0.0"))))
-                            (getSensorValue2 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "-1.0" "0.0")))))
-                         (- (getSensorValue2 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "0.0" "1.0"))))
-                            (getSensorValue2 (+ pos
-                                                (* :sensor-distance
-                                                   (vec2 "0.0" "-1.0")))))))
-        (=vec2 velocity behaviorResult.xy)
-        (=float substrateValue1 behaviorResult.z)
-        (=float substrateValue2 behaviorResult.w)
+         (=vec4 behaviorResult
+                (behavior (- (getSensorValue1 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "1.0" "0.0"))))
+                             (getSensorValue1 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "-1.0" "0.0")))))
+                          (- (getSensorValue1 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "0.0" "1.0"))))
+                             (getSensorValue1 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "0.0" "-1.0")))))
+                          (- (getSensorValue2 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "1.0" "0.0"))))
+                             (getSensorValue2 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "-1.0" "0.0")))))
+                          (- (getSensorValue2 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "0.0" "1.0"))))
+                             (getSensorValue2 (+ pos
+                                                 (* :sensor-distance
+                                                    (vec2 "0.0" "-1.0")))))))
+         (=vec2 velocity (* :agent-speed-factor
+                            (normalize
+                             (- (* "2.0"
+                                   (vec2 (sigmoid behaviorResult.x)
+                                         (sigmoid behaviorResult.y)))
+                                "1.0"))))
+         (=float substrateValue1 (sigmoid behaviorResult.z))
+         (=float substrateValue2 (sigmoid behaviorResult.w))
 
-        (=vec2 newPos
-               (fract
-                (+ pos
-                   velocity)))
-        (=vec2 randSeed
-               (+ (vec2 oldAgentColor.xy)
-                  gl_FragCoord.xy))
-        (=vec2 randPos
-               (vec2 (rand randSeed)
-                     (rand (+ randSeed (vec2 "0.1" "-0.5")))))
-        (= newAgentColor
-           (if (== randomize 0)
-             (uvec4 (* :uint16-max newPos)
-                    (* substrateValue1 :uint16-max)
-                    (* substrateValue2 :uint16-max))
-             (uvec4 (* :uint16-max randPos)
-                    (* "0.5" :uint16-max)
-                    (* "0.5" :uint16-max))))))}}
-   ["behavior"
+         (=vec2 newPos
+                (fract
+                 (+ pos
+                    velocity)))
+         (=vec2 randSeed
+                (+ (vec2 oldAgentColor.xy)
+                   gl_FragCoord.xy))
+         (=vec2 randPos
+                (vec2 (rand randSeed)
+                      (rand (+ randSeed (vec2 "0.1" "-0.5")))))
+         (= newAgentColor
+            (if (== randomize 0)
+              (uvec4 (* :uint16-max newPos)
+                     (* substrateValue1 :uint16-max)
+                     (* substrateValue2 :uint16-max))
+              (uvec4 (* :uint16-max randPos)
+                     (* "0.5" :uint16-max)
+                     (* "0.5" :uint16-max))))))}}
+    chunk)
+   ["safeDiv"
+    "sigmoid"
+    "behavior"
     "getSensorValue1"
     "getSensorValue2"
     "rand"

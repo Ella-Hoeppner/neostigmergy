@@ -2,7 +2,8 @@
   (:require [evoshader.shader-gp :refer [scratch-program
                                          breed-program
                                          compile-program]]
-            [iglu.core :refer [iglu->glsl]]))
+            [iglu.core :refer [iglu->glsl]]
+            [clojure.string :as string]))
 
 (defn scratch [{:keys [inputs outputs]
                 :as builder}]
@@ -57,3 +58,8 @@
     :inputs inputs
     :outputs outputs
     :population []}))
+
+(defn population-string [{:keys [population]}]
+  (string/replace (str population)
+                  ") ("
+                  ")\n("))

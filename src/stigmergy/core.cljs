@@ -3,17 +3,32 @@
             [stigmergy.glsl-util :refer [create-shader
                                          create-program
                                          create-ui16-tex]]
-            [stigmergy.keyboard :refer [add-key-callback]]
+            [stigmergy.keyboard :refer [add-key-callback
+                                        add-left-right-key-callback]]
             [stigmergy.config :refer [substrate-resolution
                                       background-color
                                       uint16-max
-                                      agent-count-sqrt]]
+                                      agent-count-sqrt
+                                      saved-population]]
             [stigmergy.shaders :refer [trivial-vert-source
                                        draw-frag-source
                                        substrate-frag-source
                                        trail-vert-source
                                        trail-frag-source
-                                       agents-frag-source]]))
+                                       get-agents-frag-source]]
+            [evoshader.builder :refer [create-builder
+                                       scratch
+                                       breed
+                                       delete
+                                       undelete
+                                       get-iglu-chunk
+                                       population-string]]))
+
+(defonce builder-atom (atom nil))
+(defonce builder-index-atom (atom 0))
+
+(defonce capture-size-atom (atom nil))
+(defonce capture-index-atom (atom 0))
 
 (defonce auto-update-atom (atom true))
 
@@ -42,9 +57,33 @@
 
 (defonce framebuffer-atom (atom nil))
 
+(defn save-image []
+  (let [a (js/document.createElement "a")]
+    (js/document.body.appendChild a)
+    (let [canvas  (.-canvas @gl-atom)
+          url (.replace ^js (.toDataUrl canvas "image/png")
+                        "image/png"
+                        "image/octet-stream")]
+      (set! a.href url)
+      (set! a.download (str @capture-index-atom ".png"))
+      (swap! capture-index-atom inc)
+      (.click a))
+    (js/document.body.removeChild a))
+  #_(let [gl @gl-atom]
+    (.toBlob gl.canvas
+             (fn [blob]
+               (let [a (js/document.createElement "a")]
+                 (js/document.body.appendChild a)
+                 (let [url (js/window.URL.createObjectURL blob)]
+                   (set! a.href url)
+                   (set! a.download (str @capture-index-atom ".png"))
+                   (swap! capture-index-atom inc)
+                   (.click a))
+                 (js/document.body.removeChild a))))))
+
 (defn resize-canvas [canvas]
-  (let [w js/window.innerWidth
-        h js/window.innerHeight
+  (let [w (or @capture-size-atom js/window.innerWidth)
+        h (or @capture-size-atom js/window.innerHeight)
         s (min w h)
         style canvas.style]
     (set! (.-left style) (* 0.5 (- w s)))
@@ -77,6 +116,22 @@
     (.uniform1i gl @agents-randomize-u-atom 1)
     (.drawArrays gl gl.TRIANGLES 0 3)
     (flip-textures! agent-tex-front-atom agent-tex-back-atom)))
+
+(defn clear-substrate! []
+  (let [gl @gl-atom]
+    (.bindFramebuffer gl gl.FRAMEBUFFER @framebuffer-atom)
+    (.viewport gl 0 0 substrate-resolution substrate-resolution)
+    (.framebufferTexture2D gl
+                           gl.FRAMEBUFFER
+                           gl.COLOR_ATTACHMENT0
+                           gl.TEXTURE_2D
+                           @substrate-tex-front-atom
+                           0)
+    (.clearBufferuiv gl
+                     gl.COLOR
+                     0
+                     (js/Int16Array.
+                      (clj->js (repeat 4 0))))))
 
 (defn logic-step! []
   (let [gl @gl-atom]
@@ -136,6 +191,8 @@
     (flip-textures! substrate-tex-front-atom substrate-tex-back-atom)))
 
 (defn update-page []
+  (when @auto-update-atom
+    (logic-step!))
   (resize-canvas (.-canvas @gl-atom))
   (let [gl @gl-atom
         canvas (.-canvas gl)
@@ -150,15 +207,46 @@
     (.bindTexture gl gl.TEXTURE_2D @substrate-tex-front-atom)
     (.uniform1i gl @draw-substrate-u-atom 0)
     (.drawArrays gl gl.TRIANGLES 0 3))
-  (js/requestAnimationFrame update-page)
-  (when @auto-update-atom
-    (logic-step!)))
+  (when @capture-size-atom
+    (save-image))
+  (js/requestAnimationFrame update-page))
 
-(defn ^:dev/after-load restart! []
+(defn update-behavior-program! []
+  (let [gl @gl-atom
+        agents-program
+        (create-program gl
+                        (create-shader gl :vert trivial-vert-source)
+                        (create-shader gl
+                                       :frag
+                                       (get-agents-frag-source
+                                        (get-iglu-chunk @builder-atom
+                                                        @builder-index-atom))))]
+    (reset! agents-program-atom agents-program)
+    (reset! agents-old-agent-tex-u-atom
+            (.getUniformLocation gl agents-program "oldAgentTex"))
+    (reset! agents-randomize-u-atom
+            (.getUniformLocation gl agents-program "randomize"))
+    (reset! agents-substrate-u-atom
+            (.getUniformLocation gl agents-program "substrate"))
+    (let [attrib (.getAttribLocation gl agents-program "vertPos")]
+      (.enableVertexAttribArray gl attrib)
+      (.vertexAttribPointer gl
+                            attrib
+                            2
+                            gl.FLOAT
+                            false
+                            0
+                            0)))
+  (randomize-agents!)
+  (clear-substrate!))
+
+(defn restart! []
   (when @gl-atom
     (.remove (.-canvas @gl-atom)))
   (let [canvas (js/document.createElement "canvas")
-        gl (.getContext canvas "webgl2")]
+        gl (.getContext canvas 
+                        "webgl2"
+                        (clj->js {:preserveDrawingBuffer true}))]
     (resize-canvas canvas)
     (set! (.-position canvas.style) "absolute")
     (.appendChild js/document.body canvas)
@@ -212,27 +300,6 @@
                               0
                               0)))
 
-    (let [agents-program
-          (create-program gl
-                          (create-shader gl :vert trivial-vert-source)
-                          (create-shader gl :frag agents-frag-source))]
-      (reset! agents-program-atom agents-program)
-      (reset! agents-old-agent-tex-u-atom
-              (.getUniformLocation gl agents-program "oldAgentTex"))
-      (reset! agents-randomize-u-atom
-              (.getUniformLocation gl agents-program "randomize"))
-      (reset! agents-substrate-u-atom
-              (.getUniformLocation gl agents-program "substrate"))
-      (let [attrib (.getAttribLocation gl agents-program "vertPos")]
-        (.enableVertexAttribArray gl attrib)
-        (.vertexAttribPointer gl
-                              attrib
-                              2
-                              gl.FLOAT
-                              false
-                              0
-                              0)))
-
     (let [trail-program
           (create-program gl
                           (create-shader gl :vert trail-vert-source)
@@ -251,9 +318,35 @@
     (reset! trail-tex-atom
             (create-ui16-tex gl substrate-resolution))
     (reset! framebuffer-atom (.createFramebuffer gl)))
-  (randomize-agents!))
+  (update-behavior-program!))
 
 (defn init []
+  (reset! builder-atom (create-builder 'behavior
+                                       4
+                                       4))
+  (let [jump-to-last! #(reset! builder-index-atom
+                               (dec (count (:population @builder-atom))))
+        bound-index! #(swap! builder-index-atom
+                             (comp (partial max 0)
+                                   (partial min
+                                            (dec (count (:population
+                                                         @builder-atom))))))]
+    (add-key-callback "s" #(do (swap! builder-atom scratch)
+                               (jump-to-last!)
+                               (update-behavior-program!)))
+    (add-key-callback "b" #(do (swap! builder-atom breed)
+                               (jump-to-last!)
+                               (update-behavior-program!)))
+    (add-key-callback "x" #(do (swap! builder-atom delete @builder-index-atom)
+                               (bound-index!)
+                               (update-behavior-program!)))
+    (add-key-callback "z" #(do (swap! builder-atom undelete)
+                               (jump-to-last!)
+                               (update-behavior-program!)))
+    (add-left-right-key-callback
+     #(do (swap! builder-index-atom (partial + %))
+          (bound-index!)
+          (update-behavior-program!))))
   (add-key-callback "l" logic-step!)
   (add-key-callback " " #(swap! auto-update-atom not))
   (add-key-callback "r" restart!)
@@ -268,6 +361,10 @@
                ","
                b
                ")")))
+  (swap! builder-atom
+         assoc
+         :population
+         saved-population)
   (restart!)
   (update-page))
 
@@ -276,3 +373,14 @@
                      "load"
                      (fn [_]
                        (init))))
+
+(comment
+  (u/log (population-string @builder-atom))
+  
+  (do (swap! builder-atom
+             assoc
+             :population
+             saved-population)
+      (reset! builder-index-atom 0)
+      (update-behavior-program!))
+  )
