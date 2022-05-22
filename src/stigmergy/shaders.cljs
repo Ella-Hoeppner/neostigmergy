@@ -15,11 +15,9 @@
             [clojure.string :as string]))
 
 (defn generate-gaussian-expression [value-fn radius sigma]
-  (let [side-length (inc (* 2 radius))
-        coords (map (fn [i]
-                      [(- (mod i side-length) radius)
-                       (- (quot i side-length) radius)])
-                    (range (Math/pow side-length 2)))
+  (let [coords (for [x (range (- radius) (inc radius))
+                     y (range (- radius) (inc radius))]
+                 [x y])
         factors (map (fn [[x y]]
                        (Math/exp
                         (/ (- (+ (* x x) (* y y)))
@@ -290,12 +288,15 @@
                              (getSensorValue2 (+ pos
                                                  (* :sensor-distance
                                                     (vec2 "0.0" "-1.0")))))))
-         (=vec2 velocity (* :agent-speed-factor
-                            (normalize
-                             (- (* "2.0"
-                                   (vec2 (sigmoid behaviorResult.x)
-                                         (sigmoid behaviorResult.y)))
-                                "1.0"))))
+         (=vec2 rawVelocity (- (* "2.0"
+                                  (vec2 (sigmoid behaviorResult.x)
+                                        (sigmoid behaviorResult.y)))
+                               "1.0"))
+         (=vec2 velocity (if (< (length rawVelocity) "0.01")
+                           (vec2 "0.0")
+                           (* :agent-speed-factor
+                              (normalize
+                               rawVelocity))))
          (=float substrateValue1 (sigmoid behaviorResult.z))
          (=float substrateValue2 (sigmoid behaviorResult.w))
 
