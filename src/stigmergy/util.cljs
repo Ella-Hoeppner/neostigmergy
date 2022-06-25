@@ -49,3 +49,5 @@
   (assoc! transient-coll
           key
           (f (transient-coll key))))
+
+(def TAU (* Math/PI 2))

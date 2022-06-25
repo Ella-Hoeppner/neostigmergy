@@ -1,5 +1,6 @@
 (ns stigmergy.shaders
-  (:require [stigmergy.glsl-util :refer [reorder-functions]]
+  (:require [stigmergy.util :as u]
+            [stigmergy.glsl-util :refer [reorder-functions]]
             [iglu.core :refer [iglu->glsl]]
             [clojure.walk :refer [postwalk-replace]]
             [stigmergy.config :refer [substrate-resolution
@@ -11,6 +12,8 @@
                                       agent-count-sqrt
                                       substrate-fade-factor
                                       sensor-distance
+                                      sensor-spread
+                                      angle-change-factor
                                       agent-speed-factor]]
             [clojure.string :as string]))
 
@@ -231,13 +234,7 @@
                    getSensorValue2 ([vec2] float)
                    main ([] void)}
      :functions
-     {'behavior
-      '([a b c d]
-        (vec4 "0.00025"
-              "0.0001"
-              "1.0"
-              "0.5"))
-      'rand
+     {'rand
       '([p]
         (=vec3 p3 (fract (* (vec3 p.xyx) "0.1031")))
         (+= p3 (dot p3 (+ p3.yzx "33.33")))
@@ -261,7 +258,10 @@
        {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
         :uint16-max-f (.toFixed uint16-max 1)
         :sensor-distance (.toFixed sensor-distance 8)
-        :agent-speed-factor (.toFixed agent-speed-factor 8)}
+        :agent-speed-factor (.toFixed agent-speed-factor 8)
+        :sensor-spread (.toFixed sensor-spread 8)
+        :angle-change-factor (.toFixed angle-change-factor 8)
+        :TAU (.toFixed u/TAU 8)}
        '([]
          (=uvec4 oldAgentColor
                  (texture oldAgentTex
@@ -269,41 +269,33 @@
          (=vec2 pos
                 (vec2 (/ (float "oldAgentColor.x % 65536u") :uint16-max-f)
                       (/ (float "oldAgentColor.x / 65536u") :uint16-max-f)))
+         (=float angleProp (/ (float oldAgentColor.y) :uint16-max-f))
+         (=float angle (* angleProp :TAU))
+         (=vec2 dir (vec2 (cos angle) (sin angle)))
 
-         (=vec4 behaviorResult
-                (behavior (- (getSensorValue1 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "1.0" "0.0"))))
-                             (getSensorValue1 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "-1.0" "0.0")))))
-                          (- (getSensorValue1 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "0.0" "1.0"))))
-                             (getSensorValue1 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "0.0" "-1.0")))))
-                          (- (getSensorValue2 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "1.0" "0.0"))))
-                             (getSensorValue2 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "-1.0" "0.0")))))
-                          (- (getSensorValue2 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "0.0" "1.0"))))
-                             (getSensorValue2 (+ pos
-                                                 (* :sensor-distance
-                                                    (vec2 "0.0" "-1.0")))))))
-         (=vec2 rawVelocity (- (* "2.0"
-                                  (vec2 (sigmoid behaviorResult.x)
-                                        (sigmoid behaviorResult.y)))
-                               "1.0"))
-         (=vec2 velocity (if (< (length rawVelocity) "0.001")
-                           (vec2 "0.0")
-                           (* :agent-speed-factor
-                              (normalize
-                               rawVelocity))))
+         (=vec3 behaviorResult
+                (behavior (getSensorValue1 (+ pos (* :sensor-distance dir)))
+                          (getSensorValue2 (+ pos (* :sensor-distance dir)))
+                          (- (getSensorValue1
+                              (+ pos
+                                 (* :sensor-distance
+                                    (vec2 (cos (+ angle :sensor-spread))
+                                          (sin (+ angle :sensor-spread))))))
+                             (getSensorValue1
+                              (+ pos
+                                 (* :sensor-distance
+                                    (vec2 (cos (- angle :sensor-spread))
+                                          (sin (- angle :sensor-spread)))))))
+                          (- (getSensorValue2
+                              (+ pos
+                                 (* :sensor-distance
+                                    (vec2 (cos (+ angle :sensor-spread))
+                                          (sin (+ angle :sensor-spread))))))
+                             (getSensorValue2
+                              (+ pos
+                                 (* :sensor-distance
+                                    (vec2 (cos (- angle :sensor-spread))
+                                          (sin (- angle :sensor-spread)))))))))
 
          (=vec2 randSeed
                 (+ "-70.65" (* "344.8" pos)
@@ -314,13 +306,16 @@
 
          (=vec2 newPos
                 (if (== randomize 0)
-                  (fract (+ pos velocity))
+                  (+ pos (* :agent-speed-factor dir))
                   randPos))
+         (=float newAngleProp (+ angleProp
+                                 (* :angle-change-factor
+                                    (- (* "2.0" behaviorResult.x) "1.0"))))
          (=float substrateValue1 (if (== randomize 0)
-                                   (sigmoid behaviorResult.z)
+                                   (sigmoid behaviorResult.y)
                                    "0.5"))
          (=float substrateValue2 (if (== randomize 0)
-                                   (sigmoid behaviorResult.w)
+                                   (sigmoid behaviorResult.z)
                                    "0.5"))
          (= newAgentColor
             (uvec4 (+ (uint (* :uint16-max-f
@@ -328,7 +323,7 @@
                       (* "65536u"
                          (uint (* :uint16-max-f
                                   newPos.y))))
-                   0
+                   (* newAngleProp :uint16-max-f)
                    0
                    (+ (uint (* :uint16-max-f
                                substrateValue1))

@@ -324,7 +324,7 @@
 (defn init []
   (reset! builder-atom (create-builder 'behavior
                                        4
-                                       4))
+                                       3))
   (let [jump-to-last! #(reset! builder-index-atom
                                (dec (count (:population @builder-atom))))
         bound-index! #(swap! builder-index-atom

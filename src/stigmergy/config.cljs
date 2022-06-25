@@ -3,13 +3,15 @@
 (def agent-count-sqrt 5)
 
 (def substrate-resolution 1024)
-(def point-size 0.03)
+(def point-size 0.01)
 (def gaussian-radius 3)
 (def gaussian-sigma 0.4)
 (def trail-opacity 0.015)
 (def substrate-fade-factor 0.999)
 (def sensor-distance 0.05)
-(def agent-speed-factor 0.001)
+(def sensor-spread 0.1)
+(def agent-speed-factor 0.0001)
+(def angle-change-factor 0.001)
 
 (def background-color
   [0 0 0])
