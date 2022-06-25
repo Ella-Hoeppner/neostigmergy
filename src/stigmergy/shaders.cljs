@@ -318,7 +318,8 @@
 
           (=vec2 newPos
                  (if (== randomize 0)
-                   (+ pos (* :agent-speed-factor dir))
+                   (mod (+ pos (* :agent-speed-factor dir) "1.0")
+                        "1.0")
                    (vec2 [:rand (+ pos
                                    (/ gl_FragCoord.xy :agent-count-sqrt))]
                          [:rand (+ pos
