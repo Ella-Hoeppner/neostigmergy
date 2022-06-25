@@ -143,14 +143,16 @@
                                       :uint16-max-f))
                                 "1.0"))
          (= fragColor
-            (uvec4 (* (+ :blur-exp-1
-                         (* :trail-opacity trailValue1))
-                      :uint16-max-f
-                      :substrate-fade-factor)
-                   (* (+ :blur-exp-2
-                         (* :trail-opacity trailValue2))
-                      :uint16-max-f
-                      :substrate-fade-factor)
+            (uvec4 (* (+ (* (+ :blur-exp-1
+                               (* :trail-opacity trailValue1))
+                            (- "1.0" :substrate-fade-factor))
+                         (* "0.5" :substrate-fade-factor))
+                      :uint16-max-f)
+                   (* (+ (* (+ :blur-exp-2
+                               (* :trail-opacity trailValue2))
+                            (- "1.0" :substrate-fade-factor))
+                         (* "0.5" :substrate-fade-factor))
+                      :uint16-max-f)
                    0
                    0))))}})
    ["getValue1"

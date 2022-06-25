@@ -6,7 +6,8 @@
                                          create-ui32-tex]]
             [stigmergy.keyboard :refer [add-key-callback
                                         add-left-right-key-callback]]
-            [stigmergy.config :refer [substrate-resolution
+            [stigmergy.config :refer [logic-factor
+                                      substrate-resolution
                                       background-color
                                       uint16-max
                                       agent-count-sqrt
@@ -69,18 +70,7 @@
       (set! a.download (str @capture-index-atom ".png"))
       (swap! capture-index-atom inc)
       (.click a))
-    (js/document.body.removeChild a))
-  #_(let [gl @gl-atom]
-    (.toBlob gl.canvas
-             (fn [blob]
-               (let [a (js/document.createElement "a")]
-                 (js/document.body.appendChild a)
-                 (let [url (js/window.URL.createObjectURL blob)]
-                   (set! a.href url)
-                   (set! a.download (str @capture-index-atom ".png"))
-                   (swap! capture-index-atom inc)
-                   (.click a))
-                 (js/document.body.removeChild a))))))
+    (js/document.body.removeChild a)))
 
 (defn resize-canvas [canvas]
   (let [w (or @capture-size-atom js/window.innerWidth)
@@ -132,7 +122,7 @@
                      gl.COLOR
                      0
                      (js/Int16Array.
-                      (clj->js (repeat 4 0))))))
+                      (clj->js (repeat 4 (int (* 0.5 uint16-max))))))))
 
 (defn logic-step! []
   (let [gl @gl-atom]
@@ -193,7 +183,8 @@
 
 (defn update-page []
   (when @auto-update-atom
-    (logic-step!))
+    (dotimes [i logic-factor]
+      (logic-step!)))
   (resize-canvas (.-canvas @gl-atom))
   (let [gl @gl-atom
         canvas (.-canvas gl)
