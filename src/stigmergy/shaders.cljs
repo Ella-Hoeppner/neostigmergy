@@ -59,7 +59,7 @@
 (def draw-frag-source
   (iglu-wrapper
    (postwalk-replace
-    {:uint16-max (.toFixed uint16-max 8)}
+    {:uint16-max-f (.toFixed uint16-max 1)}
     {:version "300 es"
      :precision "highp float"
      :uniforms '{size float
@@ -72,7 +72,7 @@
         (=uvec4 substrateValue (texture substrate
                                         (/ gl_FragCoord.xy size)))
         (= fragColor
-           (vec4 (/ (vec2 substrateValue.xy) :uint16-max)
+           (vec4 (/ (vec2 substrateValue.xy) :uint16-max-f)
                  0
                  1)))}})))
 
@@ -80,7 +80,7 @@
   (iglu-wrapper
    (postwalk-replace
     {:substrate-resolution (.toFixed substrate-resolution 8)
-     :uint16-max (.toFixed uint16-max 8)}
+     :uint16-max-f (.toFixed uint16-max 1)}
     {:version "300 es"
      :precision "highp float"
      :uniforms '{oldSubstrate usampler2D
@@ -98,7 +98,7 @@
                       (/ (+ gl_FragCoord.xy
                             (vec2 x y))
                          :substrate-resolution))))
-           :uint16-max))
+           :uint16-max-f))
       'getValue2
       '([x y]
         (/ (float
@@ -107,7 +107,7 @@
                       (/ (+ gl_FragCoord.xy
                             (vec2 x y))
                          :substrate-resolution))))
-           :uint16-max))
+           :uint16-max-f))
       'main
       (postwalk-replace
        {:blur-exp-1
@@ -126,20 +126,20 @@
                                         :substrate-resolution)))
          (=float trailValue1 (- (* "2.0"
                                    (/ (float trailColor.x)
-                                      :uint16-max))
+                                      :uint16-max-f))
                                 "1.0"))
          (=float trailValue2 (- (* "2.0"
                                    (/ (float trailColor.y)
-                                      :uint16-max))
+                                      :uint16-max-f))
                                 "1.0"))
          (= fragColor
             (uvec4 (* (+ :blur-exp-1
                          (* :trail-opacity trailValue1))
-                      :uint16-max
+                      :uint16-max-f
                       :substrate-fade-factor)
                    (* (+ :blur-exp-2
                          (* :trail-opacity trailValue2))
-                      :uint16-max
+                      :uint16-max-f
                       :substrate-fade-factor)
                    0
                    0))))}})
@@ -158,7 +158,7 @@
     :functions
     (postwalk-replace
      {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
-      :uint16-max (.toFixed uint16-max 1)
+      :uint16-max-f (.toFixed uint16-max 1)
       :point-size (.toFixed (* substrate-resolution
                                point-size)
                             8)}
@@ -175,10 +175,10 @@
         (=uvec4 agentColor
                 (texture agentTex
                          (vec2 agentTexX agentTexY)))
-        (=float agentX (/ (float agentColor.x) :uint16-max))
-        (=float agentY (/ (float agentColor.y) :uint16-max))
-        (= trailValue1 (/ (float agentColor.z) :uint16-max))
-        (= trailValue2 (/ (float agentColor.w) :uint16-max))
+        (=float agentX (/ (float agentColor.x) :uint16-max-f))
+        (=float agentY (/ (float agentColor.y) :uint16-max-f))
+        (= trailValue1 (/ (float agentColor.z) :uint16-max-f))
+        (= trailValue2 (/ (float agentColor.w) :uint16-max-f))
         (= gl_Position (vec4 (- (* agentX "2.0") "1.0")
                              (- (* agentY "2.0") "1.0")
                              "0.0"
@@ -238,22 +238,22 @@
         (fract (* (+ p3.x p3.y) p3.z)))
       'getSensorValue1
       (postwalk-replace
-       {:uint16-max (.toFixed uint16-max 1)}
+       {:uint16-max-f (.toFixed uint16-max 1)}
        '([pos]
          (/ (float
              (.x (texture substrate (fract pos))))
-            :uint16-max)))
+            :uint16-max-f)))
       'getSensorValue2
       (postwalk-replace
-       {:uint16-max (.toFixed uint16-max 1)}
+       {:uint16-max-f (.toFixed uint16-max 1)}
        '([pos]
          (/ (float
              (.y (texture substrate (fract pos))))
-            :uint16-max)))
+            :uint16-max-f)))
       'main
       (postwalk-replace
        {:agent-count-sqrt (.toFixed agent-count-sqrt 1)
-        :uint16-max (.toFixed uint16-max 1)
+        :uint16-max-f (.toFixed uint16-max 1)
         :sensor-distance (.toFixed sensor-distance 8)
         :agent-speed-factor (.toFixed agent-speed-factor 8)}
        '([]
@@ -262,7 +262,7 @@
                           (/ gl_FragCoord.xy :agent-count-sqrt)))
          (=vec2 pos
                 (/ (vec2 oldAgentColor.xy)
-                   :uint16-max))
+                   :uint16-max-f))
 
          (=vec4 behaviorResult
                 (behavior (- (getSensorValue1 (+ pos
@@ -301,24 +301,26 @@
          (=float substrateValue1 (sigmoid behaviorResult.z))
          (=float substrateValue2 (sigmoid behaviorResult.w))
 
-         (=vec2 newPos
-                (fract
-                 (+ pos
-                    velocity)))
          (=vec2 randSeed
                 (+ "-70.65"(* "344.8" pos)
                    (* "271.1"(/ gl_FragCoord.xy :agent-count-sqrt))))
          (=vec2 randPos
                 (vec2 (rand randSeed)
                       (rand (+ randSeed (vec2 "0.1" "-0.5")))))
+         
+         (=vec2 newPos
+                (if (== randomize 0)
+                  (fract
+                   (+ pos
+                      velocity))
+                  randPos))
          (= newAgentColor
-            (if (== randomize 0)
-              (uvec4 (* :uint16-max newPos)
-                     (* substrateValue1 :uint16-max)
-                     (* substrateValue2 :uint16-max))
-              (uvec4 (* :uint16-max randPos)
-                     (* "0.5" :uint16-max)
-                     (* "0.5" :uint16-max))))))}}
+            (uvec4 (* :uint16-max-f newPos)
+                   (if (== randomize 0)
+                     (vec2 (* substrateValue1 :uint16-max-f)
+                           (* substrateValue2 :uint16-max-f))
+                     (vec2 (* "0.5" :uint16-max-f)
+                           (* "0.5" :uint16-max-f)))))))}}
     chunk)
    ["safeDiv"
     "sigmoid"
