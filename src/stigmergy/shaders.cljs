@@ -293,7 +293,7 @@
                                   (vec2 (sigmoid behaviorResult.x)
                                         (sigmoid behaviorResult.y)))
                                "1.0"))
-         (=vec2 velocity (if (< (length rawVelocity) "0.010")
+         (=vec2 velocity (if (< (length rawVelocity) "0.001")
                            (vec2 "0.0")
                            (* :agent-speed-factor
                               (normalize

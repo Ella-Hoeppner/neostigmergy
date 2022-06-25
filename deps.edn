@@ -1,4 +1,6 @@
 {:deps
  {thheller/shadow-cljs {:mvn/version "2.19.5"}
-  iglu/iglu {:mvn/version "0.10.1"}}}
+  iglu/iglu {:mvn/version "0.10.1"}
+  io.github.Ella-Hoeppner/evoshader
+  {:git/sha "53e35200af49873f08219ff5ff71e11a0e386e36"}}}
 
