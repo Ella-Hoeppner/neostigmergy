@@ -72,7 +72,9 @@
         (=uvec4 substrateValue (texture substrate
                                         (/ gl_FragCoord.xy size)))
         (= fragColor
-           (/ (vec4 substrateValue) :uint16-max)))}})))
+           (vec4 (/ (vec2 substrateValue.xy) :uint16-max)
+                 0
+                 1)))}})))
 
 (def substrate-frag-source
   (iglu-wrapper
@@ -257,8 +259,7 @@
        '([]
          (=uvec4 oldAgentColor
                  (texture oldAgentTex
-                          (/ gl_FragCoord.xy
-                             (vec2 :agent-count-sqrt))))
+                          (/ gl_FragCoord.xy :agent-count-sqrt)))
          (=vec2 pos
                 (/ (vec2 oldAgentColor.xy)
                    :uint16-max))
@@ -292,7 +293,7 @@
                                   (vec2 (sigmoid behaviorResult.x)
                                         (sigmoid behaviorResult.y)))
                                "1.0"))
-         (=vec2 velocity (if (< (length rawVelocity) "0.01")
+         (=vec2 velocity (if (< (length rawVelocity) "0.010")
                            (vec2 "0.0")
                            (* :agent-speed-factor
                               (normalize
@@ -305,8 +306,8 @@
                  (+ pos
                     velocity)))
          (=vec2 randSeed
-                (+ (vec2 oldAgentColor.xy)
-                   gl_FragCoord.xy))
+                (+ "-70.65"(* "344.8" pos)
+                   (* "271.1"(/ gl_FragCoord.xy :agent-count-sqrt))))
          (=vec2 randPos
                 (vec2 (rand randSeed)
                       (rand (+ randSeed (vec2 "0.1" "-0.5")))))
