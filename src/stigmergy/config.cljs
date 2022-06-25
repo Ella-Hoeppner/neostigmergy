@@ -1,9 +1,9 @@
 (ns stigmergy.config)
 
-(def agent-count-sqrt 500)
+(def agent-count-sqrt 5)
 
 (def substrate-resolution 1024)
-(def point-size 0.003)
+(def point-size 0.03)
 (def gaussian-radius 3)
 (def gaussian-sigma 0.4)
 (def trail-opacity 0.015)

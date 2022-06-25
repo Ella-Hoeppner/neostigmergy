@@ -2,6 +2,7 @@
   (:require [stigmergy.util :as u]
             [stigmergy.glsl-util :refer [create-shader
                                          create-program
+                                         create-ui16-tex
                                          create-ui32-tex]]
             [stigmergy.keyboard :refer [add-key-callback
                                         add-left-right-key-callback]]
@@ -312,11 +313,11 @@
     (reset! agent-tex-back-atom
             (create-ui32-tex gl agent-count-sqrt))
     (reset! substrate-tex-front-atom
-            (create-ui32-tex gl substrate-resolution))
+            (create-ui16-tex gl substrate-resolution))
     (reset! substrate-tex-back-atom
-            (create-ui32-tex gl substrate-resolution))
+            (create-ui16-tex gl substrate-resolution))
     (reset! trail-tex-atom
-            (create-ui32-tex gl substrate-resolution))
+            (create-ui16-tex gl substrate-resolution))
     (reset! framebuffer-atom (.createFramebuffer gl)))
   (update-behavior-program!))
 

@@ -37,9 +37,13 @@
 
 (defn iglu-wrapper [iglu-code & [fn-order]]
   (let [text (iglu->glsl iglu-code)
-        fixed-text (string/replace text
-                                   "uniform usampler2D"
-                                   "uniform highp usampler2D")]
+        fixed-text (-> text
+                       (string/replace
+                        "uniform usampler2D"
+                        "uniform highp usampler2D")
+                       (string/replace
+                        "precision highp all;"
+                        "precision highp float; precision highp int;"))]
     (if fn-order
       (reorder-functions fixed-text
                          fn-order)
@@ -82,7 +86,7 @@
     {:substrate-resolution (.toFixed substrate-resolution 8)
      :uint16-max-f (.toFixed uint16-max 1)}
     {:version "300 es"
-     :precision "highp float"
+     :precision "highp all"
      :uniforms '{oldSubstrate usampler2D
                  trail usampler2D}
      :outputs '{fragColor uvec4}
@@ -150,7 +154,7 @@
 (def trail-vert-source
   (iglu-wrapper
    {:version "300 es"
-    :precision "highp float"
+    :precision "highp all"
     :signatures '{main ([] void)}
     :uniforms '{agentTex usampler2D}
     :outputs '{trailValue1 float
@@ -175,12 +179,14 @@
         (=uvec4 agentColor
                 (texture agentTex
                          (vec2 agentTexX agentTexY)))
-        (=float agentX (/ (float agentColor.x) :uint16-max-f))
-        (=float agentY (/ (float agentColor.y) :uint16-max-f))
-        (= trailValue1 (/ (float agentColor.z) :uint16-max-f))
-        (= trailValue2 (/ (float agentColor.w) :uint16-max-f))
-        (= gl_Position (vec4 (- (* agentX "2.0") "1.0")
-                             (- (* agentY "2.0") "1.0")
+        (=vec2 agentPos
+               (vec2 (/ (float "agentColor.x % 65536u") :uint16-max-f)
+                     (/ (float "agentColor.x / 65536u") :uint16-max-f)))
+        (= trailValue1
+           (/ (float "agentColor.w % 65536u") :uint16-max-f))
+        (= trailValue2
+           (/ (float "agentColor.w / 65536u") :uint16-max-f))
+        (= gl_Position (vec4 (- (* agentPos "2.0") "1.0")
                              "0.0"
                              "1.0"))
         (= gl_PointSize :point-size))})}))
@@ -188,7 +194,7 @@
 (def trail-frag-source
   (iglu-wrapper
    {:version "300 es"
-    :precision "highp float"
+    :precision "highp all"
     :inputs '{trailValue1 float
               trailValue2 float}
     :outputs '{outColor uvec4}
@@ -212,7 +218,7 @@
    (merge-with
     merge
     {:version "300 es"
-     :precision "highp float"
+     :precision "highp all"
      :uniforms '{randomize int
                  substrate usampler2D
                  oldAgentTex usampler2D}
@@ -261,8 +267,8 @@
                  (texture oldAgentTex
                           (/ gl_FragCoord.xy :agent-count-sqrt)))
          (=vec2 pos
-                (/ (vec2 oldAgentColor.xy)
-                   :uint16-max-f))
+                (vec2 (/ (float "oldAgentColor.x % 65536u") :uint16-max-f)
+                      (/ (float "oldAgentColor.x / 65536u") :uint16-max-f)))
 
          (=vec4 behaviorResult
                 (behavior (- (getSensorValue1 (+ pos
@@ -298,29 +304,37 @@
                            (* :agent-speed-factor
                               (normalize
                                rawVelocity))))
-         (=float substrateValue1 (sigmoid behaviorResult.z))
-         (=float substrateValue2 (sigmoid behaviorResult.w))
 
          (=vec2 randSeed
-                (+ "-70.65"(* "344.8" pos)
-                   (* "271.1"(/ gl_FragCoord.xy :agent-count-sqrt))))
+                (+ "-70.65" (* "344.8" pos)
+                   (* "271.1" (/ gl_FragCoord.xy :agent-count-sqrt))))
          (=vec2 randPos
                 (vec2 (rand randSeed)
                       (rand (+ randSeed (vec2 "0.1" "-0.5")))))
-         
+
          (=vec2 newPos
                 (if (== randomize 0)
-                  (fract
-                   (+ pos
-                      velocity))
+                  (fract (+ pos velocity))
                   randPos))
+         (=float substrateValue1 (if (== randomize 0)
+                                   (sigmoid behaviorResult.z)
+                                   "0.5"))
+         (=float substrateValue2 (if (== randomize 0)
+                                   (sigmoid behaviorResult.w)
+                                   "0.5"))
          (= newAgentColor
-            (uvec4 (* :uint16-max-f newPos)
-                   (if (== randomize 0)
-                     (vec2 (* substrateValue1 :uint16-max-f)
-                           (* substrateValue2 :uint16-max-f))
-                     (vec2 (* "0.5" :uint16-max-f)
-                           (* "0.5" :uint16-max-f)))))))}}
+            (uvec4 (+ (uint (* :uint16-max-f
+                               newPos.x))
+                      (* "65536u"
+                         (uint (* :uint16-max-f
+                                  newPos.y))))
+                   0
+                   0
+                   (+ (uint (* :uint16-max-f
+                               substrateValue1))
+                      (* "65536u"
+                         (uint (* :uint16-max-f
+                                  substrateValue2))))))))}}
     chunk)
    ["safeDiv"
     "sigmoid"
